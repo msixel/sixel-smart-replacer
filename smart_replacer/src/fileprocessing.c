@@ -16,30 +16,49 @@
 #include <stdbool.h>
 #include "file_record_constants.h"
 
-bool processRowValue (char* rowValue, int rowNumber, argument_rule_t* argument_rule) { // char* sequenceFilename, int startPosition, int endPosition) {
-	long sequenceValue;
+bool processRowValue (char* rowValue, int rowNumber, argument_rule_t* arg_rule) {
 	int blockLength;
 	char* blockBuffer;
 
-	if (argument_rule->rowNumber == rowNumber /* pega linhas definidas de forma literal, header e trailler(-9)*/ ||
-			(argument_rule->rowNumber == _DETAIL_RECORD_CODE && rowNumber>1 /* pega linhas de detalhe */ )) {
+	if (arg_rule->rowNumber == rowNumber /* pega linhas definidas de forma literal, header e trailler(-9)*/ ||
+			(arg_rule->rowNumber == _DETAIL_RECORD_CODE && rowNumber>1 /* pega linhas de detalhe */ )) {
 		//localizada linha para receber tratamento
 
-		if (argument_rule->endPosition > strlen(rowValue)) {
+		if (arg_rule->endPosition > strlen(rowValue)) {
 			fprintf(stderr, "BLOCO NAO LOCALIZADO NA LINHA [POSICAO_INICIAL: %ld, POSICAO_FINAL: %ld]",
-					argument_rule->startPosition, argument_rule->endPosition);
+					arg_rule->startPosition, arg_rule->endPosition);
 			return false;
 		}
 
-		if ((sequenceValue = sequenceNewValue(argument_rule->sequence)) == -1)
-			return false;
+		if (arg_rule->sequence != NULL) {
+			long sequenceValue;
+			if ((sequenceValue = sequenceNewValue(arg_rule->sequence)) == -1)
+				return false;
 
-		//criando novo bloco
-		blockLength = (argument_rule->endPosition - argument_rule->startPosition + 1);
-		blockBuffer = (char*) calloc(blockLength, sizeof(char));
-		sprintf(blockBuffer, "%0*ld", blockLength, sequenceValue);
-		memcpy(rowValue + ((argument_rule->startPosition - 1) * sizeof(char)), blockBuffer, blockLength * sizeof(char));
-		free(blockBuffer);
+			//criando novo bloco
+			blockLength = (arg_rule->endPosition - arg_rule->startPosition + 1);
+			blockBuffer = (char*) calloc(blockLength, sizeof(char));
+			sprintf(blockBuffer, "%0*ld", blockLength, sequenceValue);
+			memcpy(rowValue + ((arg_rule->startPosition - 1) * sizeof(char)), blockBuffer, blockLength * sizeof(char));
+			free(blockBuffer);
+
+		} else if (arg_rule->literalValue != NULL) {
+			blockLength = strlen(arg_rule->literalValue);
+			if (arg_rule->endPosition - arg_rule->startPosition + 1 != blockLength ) {
+				fprintf(stderr, "BLOCO PARA SUBSTITUICAO DE TAMANHO INVALIDO [POSICAO_INICIAL: %ld, POSICAO_FINAL: %ld, BLOCK_LENGTH: %ld]",
+						arg_rule->startPosition, arg_rule->endPosition, blockLength);
+				return false;
+			}
+			memcpy(rowValue + ((arg_rule->startPosition - 1) * sizeof(char)), arg_rule->literalValue, (blockLength) * sizeof(char));
+
+		} else {
+			fprintf(stderr, "ESPERADO SEQUENCE OU VALOR LITERAL");
+			return false;
+		}
+	}
+
+	if (arg_rule->nextrule != NULL) {
+		return processRowValue(rowValue, rowNumber, arg_rule->nextrule);
 	}
 
 	return true;

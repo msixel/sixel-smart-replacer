@@ -32,13 +32,13 @@ static const char* _MESSAGE_REQUIRED_INPUT_FILE_ARGUMENT = "ARGUMENTO INPUT FILE
 static const char* _MESSAGE_REQUIRED_OUTPUT_FILE_ARGUMENT = "ARGUMENTO OUTPUT FILE NAO INFORMADO";
 static const char* _MESSAGE_REQUIRED_RULE_ARGUMENT = "NENHUM ARGUMENTO REGRA INFORMADO";
 
-static const char* _MESSAGE_USAGE = "Uso: sixel_smart_replacer -input ARQUIVO_ORIGEM -output ARQUIVO_DESTINO -rule LINHA;POSICAO_INICIAL;POSICAO_FINAL;VALOR [-rule LINHA;POSICAO_INICIAL;POSICAO_FINAL;VALOR]...\n\nParametros:\n\tARQUIVO_ORIGEM - Arquivo a ser lido e convertido\n\tARQUIVO_DESTINO - Arquivo a ser escrito ou sobrescrito\n\tPOSICAO_INICIAL - Posicao inicial a ser substituida\n\tPOSICAO_FINAL - Posicao final a ser substituida (inclusive)\n\tVALOR - Valor literal ou sequencia a ser escrito (sequencia no formato seq:NOME_SEQUENCIA)\n\n";
-static const char* _TOKEN_RULE_SPLITTER = "^";
+static const char* _MESSAGE_USAGE = "Uso: sixel_smart_replacer -input ARQUIVO_ORIGEM -output ARQUIVO_DESTINO -rule LINHA,POSICAO_INICIAL,POSICAO_FINAL,VALOR [-rule LINHA,POSICAO_INICIAL,POSICAO_FINAL,VALOR]...\n\nParametros:\n\tARQUIVO_ORIGEM - Arquivo a ser lido e convertido\n\tARQUIVO_DESTINO - Arquivo a ser escrito ou sobrescrito\n\tPOSICAO_INICIAL - Posicao inicial a ser substituida\n\tPOSICAO_FINAL - Posicao final a ser substituida (inclusive)\n\tVALOR - Valor literal ou sequencia a ser escrito (sequencia no formato seq:NOME_SEQUENCIA)\n\n";
+static const char* _TOKEN_RULE_SPLITTER = ",";
 static const char* _TOKEN_RULE_SEQUENCE = "seq:";
 
 
 bool parseRuleSequenceParameter(char* arg, sequence_t* sequence) {
-	sequence->name = arg;
+	sequence->name = strdup(arg);
 	sequence->file = (char*) calloc(strlen (arg) + strlen(_SEQUENCE_FILE_EXTENSION) + 1, sizeof(char));// alocando memoria dinamicamente do heap
 	sequence->file = strcpy(sequence->file, arg);
 	sequence->file = strcat(sequence->file, _SEQUENCE_FILE_EXTENSION);
@@ -58,7 +58,7 @@ bool parseRuleValueParameter(char* arg, argument_rule_t* arg_rule) {
 		arg_rule->literalValue=NULL;
 	} else {
 		arg_rule->sequence = NULL;
-		arg_rule->literalValue = arg;
+		arg_rule->literalValue = strdup(arg);
 	}
 	return true;
 }
@@ -125,13 +125,13 @@ bool parseRuleParameter(char* arg, argument_rule_t* arg_rule){
 }
 
 bool parseParameters(int argc, char *argv[], arguments_t* arguments) {
+	int contador;
 	bool usageMessagePrinted = false;
 
 	arguments->inputfile = NULL;
 	arguments->outputfile = NULL;
 	arguments->firstrule = NULL;
 
-	int contador;
 	for (contador=1; contador<argc; contador++) {
 		char* arg = argv[contador];
 
@@ -145,12 +145,12 @@ bool parseParameters(int argc, char *argv[], arguments_t* arguments) {
 			if (strcasecmp(arg, _PAR_INPUT)==0) {
 				contador++;
 				if (contador<argc) {
-					arguments->inputfile = argv[contador];
+					arguments->inputfile = strdup(argv[contador]);
 				}
 			} else if (strcasecmp(arg, _PAR_OUTPUT)==0) {
 				contador++;
 				if (contador<argc) {
-					arguments->outputfile = argv[contador];
+					arguments->outputfile = strdup(argv[contador]);
 				}
 			} else if (strcasecmp(arg, _PAR_RULE)==0) {
 				contador++;
@@ -158,7 +158,7 @@ bool parseParameters(int argc, char *argv[], arguments_t* arguments) {
 					argument_rule_t* arg_rule;
 					arg_rule = (argument_rule_t*) malloc(sizeof(argument_rule_t));
 					parseRuleParameter(argv[contador], arg_rule);
-					addRule(arguments, arg_rule);
+					appendRule(arguments, arg_rule);
 				}
 			} else {
 				if (!usageMessagePrinted) {
@@ -200,23 +200,23 @@ bool parseParameters(int argc, char *argv[], arguments_t* arguments) {
 	return true;
 }
 
-bool addNextRule(argument_rule_t* arg_rule_previous, argument_rule_t* arg_rule) {
+bool appendNextRule(argument_rule_t* arg_rule_previous, argument_rule_t* arg_rule) {
 	//adicionando rule no fim da lista encadeada
 	if (arg_rule_previous->nextrule == NULL) {
 		arg_rule_previous->nextrule = arg_rule;
 		return true;
 	} else {
-		return addNextRule(arg_rule_previous->nextrule, arg_rule);
+		return appendNextRule(arg_rule_previous->nextrule, arg_rule);
 	}
 }
 
-bool addRule(arguments_t* arguments, argument_rule_t* arg_rule){
+bool appendRule(arguments_t* arguments, argument_rule_t* arg_rule){
 	//adicionando rule no fim da lista encadeada
 	if (arguments->firstrule == NULL) {
 		arguments->firstrule = arg_rule;
 		return true;
 	} else {
-		return addNextRule(arguments->firstrule, arg_rule);
+		return appendNextRule(arguments->firstrule, arg_rule);
 	}
 }
 
@@ -225,6 +225,14 @@ bool destroyNextRule(argument_rule_t* arg_rule) {
 	if (arg_rule->nextrule != NULL) {
 		destroyNextRule(arg_rule->nextrule);
 		arg_rule->nextrule = NULL;
+	}
+	if (arg_rule->sequence != NULL) {
+		free(arg_rule->sequence->file);
+		free(arg_rule->sequence->name);
+		free(arg_rule->sequence);
+	}
+	if (arg_rule->literalValue != NULL) {
+		free(arg_rule->literalValue);
 	}
 	free(arg_rule);
 	return true;
