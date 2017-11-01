@@ -9,8 +9,9 @@
 #define FILEPROCESSING_H_
 
 #include <stdbool.h>
+#include "arguments_types.h"
 
-bool replaceSequenceValue (char* rowValue, char* sequenceFilename, int startPosition, int endPosition);
-bool processFile(char* sourceFilename, char* sequenceFilename, int rowNumber, int startPosition, int endPosition, char* targetFilename);
+bool processRowValue (char* rowValue, int rowNumber, argument_rule_t* argument_rule);
+bool processFile(arguments_t arguments);
 
 #endif /* FILEPROCESSING_H_ */

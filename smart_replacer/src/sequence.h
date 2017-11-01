@@ -9,8 +9,11 @@
 #define SEQUENCE_H_
 
 #include <stdbool.h>
+#include "arguments_types.h"
 
-bool initializeSequenceFile(char* sequenceFilename);
-long sequenceNewValue(char* sequenceFilename);
+static const long SEQUENCE_INITIAL_VALUE = 0;
+
+bool initializeSequenceFile(sequence_t* sequence);
+long sequenceNewValue(sequence_t* sequence);
 
 #endif /* SEQUENCE_H_ */
