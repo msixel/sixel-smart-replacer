@@ -23,6 +23,9 @@ static const char* _TRAILLER_RECORD_LABEL = "TRAILLER";
 static const char* _PAR_INPUT = "-INPUT";
 static const char* _PAR_OUTPUT = "-OUTPUT";
 static const char* _PAR_RULE = "-RULE";
+static const char* _PAR_INPUT_SHORT = "-I";
+static const char* _PAR_OUTPUT_SHORT = "-O";
+static const char* _PAR_RULE_SHORT = "-R";
 
 static const char* _MESSAGE_WARN = "Aviso: ";
 static const char* _MESSAGE_ERROR = "Erro:";
@@ -32,7 +35,7 @@ static const char* _MESSAGE_REQUIRED_INPUT_FILE_ARGUMENT = "ARGUMENTO INPUT FILE
 static const char* _MESSAGE_REQUIRED_OUTPUT_FILE_ARGUMENT = "ARGUMENTO OUTPUT FILE NAO INFORMADO";
 static const char* _MESSAGE_REQUIRED_RULE_ARGUMENT = "NENHUM ARGUMENTO REGRA INFORMADO";
 
-static const char* _MESSAGE_USAGE = "Uso: sixel_smart_replacer -input ARQUIVO_ORIGEM -output ARQUIVO_DESTINO -rule LINHA,POSICAO_INICIAL-POSICAO_FINAL,VALOR [-rule LINHA,POSICAO_INICIAL-POSICAO_FINAL,VALOR]...\n\nParametros:\n\tARQUIVO_ORIGEM - Arquivo a ser lido e convertido\n\tARQUIVO_DESTINO - Arquivo a ser escrito ou sobrescrito\n\tPOSICAO_INICIAL - Posicao inicial a ser substituida\n\tPOSICAO_FINAL - Posicao final a ser substituida (inclusive)\n\tVALOR - Valor literal ou sequencia a ser escrito (sequencia no formato seq:NOME_SEQUENCIA)\n\n";
+static const char* _MESSAGE_USAGE = "Uso: sixel_smart_replacer -i[nput] ARQUIVO_ORIGEM -o[utput] ARQUIVO_DESTINO -r[ule] LINHA,POSICAO_INICIAL-POSICAO_FINAL,VALOR [-r[ule] LINHA,POSICAO_INICIAL-POSICAO_FINAL,VALOR]...\n\nParametros:\n\tARQUIVO_ORIGEM - Arquivo a ser lido e convertido\n\tARQUIVO_DESTINO - Arquivo a ser escrito ou sobrescrito\n\tPOSICAO_INICIAL - Posicao inicial a ser substituida\n\tPOSICAO_FINAL - Posicao final a ser substituida (inclusive)\n\tVALOR - Valor literal ou sequencia a ser escrito (sequencia no formato seq:NOME_SEQUENCIA)\n\n";
 static const char* _TOKEN_RULE_DELIMITER = ",";
 static const char* _TOKEN_RULE_POS_DELIMITER = "-";
 static const char* _TOKEN_RULE_SEQUENCE_PREFIX = "seq:";
@@ -156,17 +159,20 @@ bool parseArgumentsParameters(int argc, char *argv[], arguments_t* arguments) {
 			}
 			fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_WARN, _MESSAGE_INVALID_FORMAT, arg);
 		} else {
-			if (strcasecmp(arg, _PAR_INPUT)==0) {
+			if (strcasecmp(arg, _PAR_INPUT)==0 ||
+					strcasecmp(arg, _PAR_INPUT_SHORT)==0) {
 				contador++;
 				if (contador<argc) {
 					arguments->inputfile = strdup(argv[contador]);
 				}
-			} else if (strcasecmp(arg, _PAR_OUTPUT)==0) {
+			} else if (strcasecmp(arg, _PAR_OUTPUT)==0 ||
+					strcasecmp(arg, _PAR_OUTPUT_SHORT)==0) {
 				contador++;
 				if (contador<argc) {
 					arguments->outputfile = strdup(argv[contador]);
 				}
-			} else if (strcasecmp(arg, _PAR_RULE)==0) {
+			} else if (strcasecmp(arg, _PAR_RULE)==0 ||
+					strcasecmp(arg, _PAR_RULE_SHORT)==0) {
 				contador++;
 				if (contador<argc) {
 					argument_rule_t* arg_rule;
