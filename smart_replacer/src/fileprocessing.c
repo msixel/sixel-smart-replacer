@@ -45,7 +45,7 @@ bool processRowValue (char* rowValue, int rowNumber, argument_rule_t* arg_rule) 
 		} else if (arg_rule->literalValue != NULL) {
 			blockLength = strlen(arg_rule->literalValue);
 			if (arg_rule->endPosition - arg_rule->startPosition + 1 != blockLength ) {
-				fprintf(stderr, "BLOCO PARA SUBSTITUICAO DE TAMANHO INVALIDO [POSICAO_INICIAL: %ld, POSICAO_FINAL: %ld, BLOCK_LENGTH: %ld]",
+				fprintf(stderr, "BLOCO PARA SUBSTITUICAO DE TAMANHO INVALIDO [POSICAO_INICIAL: %ld, POSICAO_FINAL: %ld, BLOCK_LENGTH: %d]",
 						arg_rule->startPosition, arg_rule->endPosition, blockLength);
 				return false;
 			}
