@@ -17,17 +17,15 @@
 #include <stdbool.h>
 
 int main(int argc, char *argv[]) {
-	struct arguments arguments;
+	arguments_t arguments;
 
-	if (!parseParameters(argc, argv, &arguments)) {
+	if (!parseArgumentsParameters(argc, argv, &arguments)) {
 		return EXIT_FAILURE;
 	}
 
-	//fprintf(stdout, "sequenceName: %s\nrowNumber: %ld\nstartPosition: %ld\nendPosition: %ld\n", sequenceFilename, rowNumber, startPosition, endPosition);
-
 	if (!initializeSequenceFiles(arguments.firstrule) ||
 			!processFile(arguments) ||
-			!destroyFirstRule(&arguments)) {
+			!destroyArguments(&arguments)) {
 		return EXIT_FAILURE;
 	}
 
