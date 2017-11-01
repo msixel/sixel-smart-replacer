@@ -39,6 +39,8 @@ static const char* _MESSAGE_USAGE = "Uso: sixel_smart_replacer -i[nput] ARQUIVO_
 static const char* _TOKEN_RULE_DELIMITER = ",";
 static const char* _TOKEN_RULE_POS_DELIMITER = "-";
 static const char* _TOKEN_RULE_SEQUENCE_PREFIX = "seq:";
+static const char* _TOKEN_RULE_CUSTOM_ROW_PREFIX = "custom:";
+static const char* _TOKEN_RULE_CUSTOM_ROW_DELIMITER = "=";
 
 
 bool parseRuleSequenceParameter(char* arg, sequence_t* sequence) {
@@ -67,6 +69,64 @@ bool parseRuleValueParameter(char* arg, argument_rule_t* arg_rule) {
 	return true;
 }
 
+bool parseRuleRowCustomBlockParameter(char* arg, )
+	return true;
+}
+
+bool parseRuleRowCustomParameter(char* arg, custom_row_t* custom_row ) {
+	int contador;
+	char* argToken;
+	argToken = strtok_r(arg, _TOKEN_RULE_CUSTOM_ROW_DELIMITER, &arg);
+	for (contador=0; argToken != NULL; contador++ ) {
+		switch(contador) {
+		case 0:
+			//argumento blocos posicionais - lista encadeada
+			break;
+
+		case 1:
+			//argumento valor discriminador/identificador
+			custom_row->discriminator = strdup(argToken);
+			break;
+
+		default:
+			fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_WARN, _MESSAGE_INVALID_FORMAT, arg);
+			break;
+		}
+		argToken = strtok_r(arg, _TOKEN_RULE_DELIMITER, &arg);
+	}
+	return true;
+}
+
+bool parseRuleRowParameter(char* arg, argument_rule_t* arg_rule) {
+	char* customRowArg;
+
+	if (strcasecmp(_HEADER_RECORD_LABEL, arg)==0) {
+		arg_rule->custom_row = NULL;
+		arg_rule->rowNumber = _HEADER_RECORD_CODE;
+
+	} else if (strcasecmp(_DETAIL_RECORD_LABEL, arg)==0 ) {
+		arg_rule->custom_row = NULL;
+		arg_rule->rowNumber = _DETAIL_RECORD_CODE;
+
+	} else if (strcasecmp(_TRAILLER_RECORD_LABEL, arg)==0) {
+		arg_rule->custom_row = NULL;
+		arg_rule->rowNumber = _TRAILLER_RECORD_CODE;
+
+	} else if ((customRowArg = strstr(arg, _TOKEN_RULE_CUSTOM_ROW_PREFIX))!=NULL) {
+		customRowArg += strlen(_TOKEN_RULE_CUSTOM_ROW_PREFIX);//avancando o token para obter as definicoes do custom row
+		arg_rule->custom_row = (custom_row_t*) malloc(sizeof(custom_row_t));
+		arg_rule->rowNumber = -1;
+		if (!parseRuleRowCustomParameter(customRowArg, arg_rule->custom_row)) {
+			return false;
+		}
+	} else {
+		arg_rule->custom_row = NULL;
+		arg_rule->rowNumber = strtol(arg, NULL, 0);
+	}
+
+	return true;
+}
+
 bool parseRuleParameter(char* arg, argument_rule_t* arg_rule){
 	int contador;
 	char* argToken;
@@ -78,17 +138,8 @@ bool parseRuleParameter(char* arg, argument_rule_t* arg_rule){
 		switch(contador) {
 		case 0:
 			//argumento linha
-			if (strcasecmp(_HEADER_RECORD_LABEL, argToken)==0) {
-				arg_rule->rowNumber = _HEADER_RECORD_CODE;
-
-			} else if (strcasecmp(_DETAIL_RECORD_LABEL, argToken)==0 ) {
-				arg_rule->rowNumber = _DETAIL_RECORD_CODE;
-
-			} else if (strcasecmp(_TRAILLER_RECORD_LABEL, argToken)==0) {
-				arg_rule->rowNumber = _TRAILLER_RECORD_CODE;
-
-			} else {
-				arg_rule->rowNumber = strtol(argToken, NULL, 0);
+			if (!parseRuleRowParameter(argToken, arg_rule)) {
+				return false;
 			}
 			break;
 
@@ -116,7 +167,7 @@ bool parseRuleParameter(char* arg, argument_rule_t* arg_rule){
 		case 2:
 			//argumento valor (sequence ou literal)
 			if (!parseRuleValueParameter(argToken, arg_rule)) {
-				fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_WARN, _MESSAGE_INVALID_FORMAT, argToken);
+				return false;
 			}
 			break;
 
@@ -240,8 +291,23 @@ bool appendRule(arguments_t* arguments, argument_rule_t* arg_rule){
 	}
 }
 
+void destroyRuleRowCustomBlock(custom_row_block* custom_row_block) {
+	if (custom_row_block->nextblock != NULL) {
+		destroyRuleRowCustomBlock(custom_row_block->nextblock);
+		custom_row_block->nextblock = NULL;
+	}
+	free(custom_row_block);
+}
 
-bool destroyRule(argument_rule_t* arg_rule) {
+void destroyRule(argument_rule_t* arg_rule) {
+	if (arg_rule->custom_row != NULL) {
+		if (arg_rule->custom_row->firstblock != NULL) {
+			destroyRuleRowCustomBlock(arg_rule->custom_row->firstblock);
+			arg_rule->custom_row->firstblock = NULL;
+		}
+		free(arg_rule->custom_row->discriminator);
+		free(arg_rule->custom_row);
+	}
 	if (arg_rule->nextrule != NULL) {
 		destroyRule(arg_rule->nextrule);
 		arg_rule->nextrule = NULL;
@@ -255,10 +321,9 @@ bool destroyRule(argument_rule_t* arg_rule) {
 		free(arg_rule->literalValue);
 	}
 	free(arg_rule);
-	return true;
 }
 
-bool destroyArguments(arguments_t* arguments) {
+void destroyArguments(arguments_t* arguments) {
 	if (arguments->firstrule != NULL) {
 		destroyRule(arguments->firstrule);
 		arguments->firstrule = NULL;
@@ -266,6 +331,5 @@ bool destroyArguments(arguments_t* arguments) {
 	free(arguments->inputfile);
 	free(arguments->outputfile);
 //	free(arguments); //alocacao estatica com variavel typedef - nao utilizou malloc, calloc ou realloc
-	return true;
 }
 

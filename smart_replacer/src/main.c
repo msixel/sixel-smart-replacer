@@ -24,11 +24,12 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (!initializeSequenceFiles(arguments.firstrule) ||
-			!processFile(arguments) ||
-			!destroyArguments(&arguments)) {
+			!processFile(arguments)) {
+
+		destroyArguments(&arguments);
 		return EXIT_FAILURE;
 	}
-
+	destroyArguments(&arguments);
 	return EXIT_SUCCESS;
 }
 
