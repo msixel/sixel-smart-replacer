@@ -19,19 +19,18 @@
 int main(int argc, char *argv[]) {
 	struct arguments arguments;
 
-	if (!receiveParameters(argc, argv, &arguments)) {
+	if (!parseParameters(argc, argv, &arguments)) {
 		return EXIT_FAILURE;
 	}
 
 	//fprintf(stdout, "sequenceName: %s\nrowNumber: %ld\nstartPosition: %ld\nendPosition: %ld\n", sequenceFilename, rowNumber, startPosition, endPosition);
 
-	if (!initializeSequenceFile(arguments.firstrule->sequence))
+	if (!initializeSequenceFiles(arguments.firstrule) ||
+			!processFile(arguments) ||
+			!destroyFirstRule(&arguments)) {
 		return EXIT_FAILURE;
+	}
 
-	if (!processFile(arguments))
-		return EXIT_FAILURE;
-
-	destroyRules(&arguments);
 	return EXIT_SUCCESS;
 }
 

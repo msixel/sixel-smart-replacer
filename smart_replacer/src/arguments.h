@@ -11,10 +11,12 @@
 #include <stdbool.h>
 #include "arguments_types.h"
 
-bool receiveSequenceParameter(char* arg, sequence_t* sequence);
-bool receiveRuleParameter(char* arg, argument_rule_t* arg_rule);
-bool receiveParameters(int argc, char *argv[], arguments_t* arguments);
+bool parseRuleSequenceParameter(char* arg, sequence_t* sequence);
+bool parseRuleParameter(char* arg, argument_rule_t* arg_rule);
+bool parseParameters(int argc, char *argv[], arguments_t* arguments);
+bool addNextRule(argument_rule_t* arg_rule_previous, argument_rule_t* arg_rule);
 bool addRule(arguments_t* arguments, argument_rule_t* arg_rule);
-bool destroyRules(arguments_t* arguments);
+bool destroyNextRule(argument_rule_t* arg_rule);
+bool destroyFirstRule(arguments_t* arguments);
 
 #endif /* ARGUMENTS_H_ */

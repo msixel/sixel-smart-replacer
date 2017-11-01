@@ -15,6 +15,7 @@ typedef struct sequence {
 
 typedef struct argument_rule {
 	struct sequence* sequence;
+	char* literalValue;
 	long rowNumber;
 	long startPosition;
 	long endPosition;

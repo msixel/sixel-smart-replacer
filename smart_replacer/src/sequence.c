@@ -34,6 +34,26 @@ bool initializeSequenceFile(sequence_t* sequence) {
 }
 
 /*
+ * rotina para verificar se arquivos existem e inicializa-los se necessario
+ */
+bool initializeSequenceFiles(argument_rule_t* arg_rule) {
+	FILE* sequenceFile;
+
+	if (arg_rule->sequence != NULL) {
+		if (!initializeSequenceFile(arg_rule->sequence)) {
+			return false;
+		}
+	}
+
+	if (arg_rule->nextrule == NULL) { // fim de lista encadeada (folha)
+		return true;
+	} else {
+		//ainda tem lista encadeada / descendo proximo nivel em busca da folha
+		return initializeSequenceFiles(arg_rule->nextrule);
+	}
+}
+
+/*
  * rotina para obter valor atual da sequence, incrementar,
  * persistir e retornar o valor incrementado
  */

@@ -25,46 +25,52 @@ static const char* _PAR_OUTPUT = "-OUTPUT";
 static const char* _PAR_RULE = "-RULE";
 
 static const char* _MESSAGE_WARN = "Aviso: ";
+static const char* _MESSAGE_ERROR = "Erro:";
 static const char* _MESSAGE_INVALID_FORMAT = "FORMATO INVALIDO";
 static const char* _MESSAGE_INVALID_ARGUMENT = "ARGUMENTO INVALIDO";
 static const char* _MESSAGE_REQUIRED_INPUT_FILE_ARGUMENT = "ARGUMENTO INPUT FILE NAO INFORMADO";
 static const char* _MESSAGE_REQUIRED_OUTPUT_FILE_ARGUMENT = "ARGUMENTO OUTPUT FILE NAO INFORMADO";
 static const char* _MESSAGE_REQUIRED_RULE_ARGUMENT = "NENHUM ARGUMENTO REGRA INFORMADO";
 
-static const char* _MESSAGE_USAGE = "Uso: rsi_reuse_file_test_data -input ARQUIVO_ORIGEM -output ARQUIVO_DESTINO -rule LINHA;POSICAO_INICIAL;POSICAO_FINAL;VALOR [-rule LINHA;POSICAO_INICIAL;POSICAO_FINAL;VALOR]...\n\nARQUIVO_ORIGEM - Arquivo a ser lido e convertido\nARQUIVO_DESTINO - Arquivo a ser escrito ou sobrescrito\nPOSICAO_INICIAL - Posicao inicial a ser substituida\nPOSICAO_FINAL - Posicao final a ser substituida (inclusive)\nVALOR - Valor literal ou sequencia a ser escrito (sequencia no formato seq:NOME_SEQUENCIA)\n\n";
-static const char _TOKEN_RULE_SPLITTER[2] = ";";
-static const char _TOKEN_RULE_SEQUENCE[5] = "seq:";
+static const char* _MESSAGE_USAGE = "Uso: sixel_smart_replacer -input ARQUIVO_ORIGEM -output ARQUIVO_DESTINO -rule LINHA;POSICAO_INICIAL;POSICAO_FINAL;VALOR [-rule LINHA;POSICAO_INICIAL;POSICAO_FINAL;VALOR]...\n\nParametros:\n\tARQUIVO_ORIGEM - Arquivo a ser lido e convertido\n\tARQUIVO_DESTINO - Arquivo a ser escrito ou sobrescrito\n\tPOSICAO_INICIAL - Posicao inicial a ser substituida\n\tPOSICAO_FINAL - Posicao final a ser substituida (inclusive)\n\tVALOR - Valor literal ou sequencia a ser escrito (sequencia no formato seq:NOME_SEQUENCIA)\n\n";
+static const char* _TOKEN_RULE_SPLITTER = "^";
+static const char* _TOKEN_RULE_SEQUENCE = "seq:";
 
 
-bool receiveSequenceParameter(char* arg, sequence_t* sequence) {
+bool parseRuleSequenceParameter(char* arg, sequence_t* sequence) {
 	sequence->name = arg;
 	sequence->file = (char*) calloc(strlen (arg) + strlen(_SEQUENCE_FILE_EXTENSION) + 1, sizeof(char));// alocando memoria dinamicamente do heap
-	sequence->file = strcpy(sequence->file, sequenceTmp);
+	sequence->file = strcpy(sequence->file, arg);
 	sequence->file = strcat(sequence->file, _SEQUENCE_FILE_EXTENSION);
-	//validando sequence
-	if (arg_rule->startPosition < 1) {
-		fprintf (stderr, "POSICAO_INICIAL INVALIDA [%ld]\n", arg_rule->startPosition);
-		return false;
-	}
-	if (arg_rule->startPosition > arg_rule->endPosition) {
-		fprintf (stderr, "POSICAO_FINAL DEVE SER MAIOR QUE POSICAO_INICIAL [%ld, %ld]\n", arg_rule->startPosition, arg_rule->endPosition);
-		return false;
+	return true;
+}
+
+bool parseRuleValueParameter(char* arg, argument_rule_t* arg_rule) {
+	//argumento valor (sequence ou literal)
+	char* sequenceTmp;
+	if ((sequenceTmp = strstr(arg, _TOKEN_RULE_SEQUENCE))!=NULL) {
+		//criando sequence
+		sequenceTmp += strlen(_TOKEN_RULE_SEQUENCE);//avancando o token para obter o nome da sequence
+		arg_rule->sequence = (sequence_t*)malloc(sizeof(sequence_t));
+		if (!parseRuleSequenceParameter(sequenceTmp, arg_rule->sequence)) {
+			return false;
+		}
+		arg_rule->literalValue=NULL;
+	} else {
+		arg_rule->sequence = NULL;
+		arg_rule->literalValue = arg;
 	}
 	return true;
 }
 
-bool receiveRuleParameter(char* arg, argument_rule_t* arg_rule){
-	//recebendo parametros
-
+bool parseRuleParameter(char* arg, argument_rule_t* arg_rule){
 	char* tmp;
 	tmp = strtok(arg, _TOKEN_RULE_SPLITTER);
 
 	int contador;
 	for (contador=0; tmp != NULL; contador++ ) {
-		printf( "%s\n", tmp );
-		tmp = strtok(NULL, _TOKEN_RULE_SPLITTER);
-
-		if (contador==0) {
+		switch(contador) {
+		case 0:
 			//argumento linha
 			if (strcasecmp(_HEADER_RECORD_LABEL, tmp)==0) {
 				arg_rule->rowNumber = _HEADER_RECORD_CODE;
@@ -78,34 +84,48 @@ bool receiveRuleParameter(char* arg, argument_rule_t* arg_rule){
 			} else {
 				arg_rule->rowNumber = strtol(tmp, NULL, 0);
 			}
-		}
-		if (contador==1) {
+			break;
+
+		case 1:
 			//argumento posicao inicial
 			arg_rule->startPosition = strtol(tmp, NULL, 0);
-		}
-		if (contador==2) {
+			break;
+
+		case 2:
 			//argumento posicao final
 			arg_rule->endPosition = strtol(tmp, NULL, 0);
-		}
-		if (contador==3) {
+			break;
+
+		case 3:
 			//argumento valor (sequence ou literal)
-			char* sequenceTmp;
-			if ((sequenceTmp = strstr(tmp, _TOKEN_RULE_SEQUENCE)!=NULL)) {
-				//criando sequence
-				sequenceTmp += strlen(_TOKEN_RULE_SEQUENCE);//avancando o token para obter o nome da sequence
-				arg_rule->sequence = (sequence_t*)malloc(sizeof(sequence_t));
-				arg_rule->nextrule = NULL;
-				if (!receiveSequenceParameter(sequenceTmp, arg_rule->sequence)) {
-					return false;
-				}
+			if (!parseRuleValueParameter(tmp, arg_rule)) {
+				fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_WARN, _MESSAGE_INVALID_FORMAT, tmp);
 			}
+			break;
+
+		default:
+			fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_WARN, _MESSAGE_INVALID_FORMAT, arg);
+			break;
 		}
+		tmp = strtok(NULL, _TOKEN_RULE_SPLITTER);
+	}
+
+	arg_rule->nextrule = NULL;
+	//validando sequence
+	if (arg_rule->startPosition < 1) {
+		fprintf (stderr, "POSICAO_INICIAL INVALIDA [%ld]\n", arg_rule->startPosition);
+		return false;
+	}
+	if (arg_rule->startPosition > arg_rule->endPosition) {
+		fprintf (stderr, "POSICAO_FINAL DEVE SER MAIOR QUE POSICAO_INICIAL [%ld, %ld]\n", arg_rule->startPosition, arg_rule->endPosition);
+		return false;
 	}
 
 	return true;
 }
 
-bool receiveParameters(int argc, char *argv[], arguments_t* arguments) {
+bool parseParameters(int argc, char *argv[], arguments_t* arguments) {
+	bool usageMessagePrinted = false;
 
 	arguments->inputfile = NULL;
 	arguments->outputfile = NULL;
@@ -116,7 +136,11 @@ bool receiveParameters(int argc, char *argv[], arguments_t* arguments) {
 		char* arg = argv[contador];
 
 		if (strlen(arg)==0 || arg[0]!='-') {
-			fprintf(stderr, "%s\n%s %s [%s]\n", _MESSAGE_USAGE, _MESSAGE_WARN, _MESSAGE_INVALID_FORMAT, arg);
+			if (!usageMessagePrinted) {
+				fprintf(stderr, "%s\n", _MESSAGE_USAGE);
+				usageMessagePrinted = true;
+			}
+			fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_WARN, _MESSAGE_INVALID_FORMAT, arg);
 		} else {
 			if (strcasecmp(arg, _PAR_INPUT)==0) {
 				contador++;
@@ -131,43 +155,86 @@ bool receiveParameters(int argc, char *argv[], arguments_t* arguments) {
 			} else if (strcasecmp(arg, _PAR_RULE)==0) {
 				contador++;
 				if (contador<argc) {
-					fprintf(stdout, "%s\n", argv[contador]);
-
 					argument_rule_t* arg_rule;
 					arg_rule = (argument_rule_t*) malloc(sizeof(argument_rule_t));
-					receiveRuleParameter(argv[contador], arg_rule);
+					parseRuleParameter(argv[contador], arg_rule);
 					addRule(arguments, arg_rule);
 				}
 			} else {
-				fprintf(stderr, "%s\n%s %s [%s]\n", _MESSAGE_USAGE, _MESSAGE_WARN, _MESSAGE_INVALID_ARGUMENT, arg);
+				if (!usageMessagePrinted) {
+					fprintf(stderr, "%s\n", _MESSAGE_USAGE);
+					usageMessagePrinted = true;
+				}
+				fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_WARN, _MESSAGE_INVALID_ARGUMENT, arg);
 			}
 		}
 	}
 
 	if (arguments->inputfile == NULL) {
-		fprintf (stderr, "%s\n%s\n", _MESSAGE_USAGE, _MESSAGE_REQUIRED_INPUT_FILE_ARGUMENT);
+		if (!usageMessagePrinted) {
+			fprintf(stderr, "%s\n", _MESSAGE_USAGE);
+			usageMessagePrinted = true;
+		}
+		fprintf (stderr, "%s\t%s\n", _MESSAGE_ERROR, _MESSAGE_REQUIRED_INPUT_FILE_ARGUMENT);
 		return false;
 	}
 
 	if (arguments->outputfile == NULL) {
-		fprintf (stderr, "%s\n%s\n", _MESSAGE_USAGE, _MESSAGE_REQUIRED_OUTPUT_FILE_ARGUMENT);
+		if (!usageMessagePrinted) {
+			fprintf(stderr, "%s\n", _MESSAGE_USAGE);
+			usageMessagePrinted = true;
+		}
+		fprintf (stderr, "%s\t%s\n", _MESSAGE_ERROR, _MESSAGE_REQUIRED_OUTPUT_FILE_ARGUMENT);
 		return false;
 	}
 
 	if (arguments->firstrule == NULL) {
-		fprintf (stderr, "%s\n%s\n", _MESSAGE_USAGE, _MESSAGE_REQUIRED_RULE_ARGUMENT);
+		if (!usageMessagePrinted) {
+			fprintf(stderr, "%s\n", _MESSAGE_USAGE);
+			usageMessagePrinted = true;
+		}
+		fprintf (stderr, "%s\t%s\n", _MESSAGE_ERROR, _MESSAGE_REQUIRED_RULE_ARGUMENT);
 		return false;
 	}
 
 	return true;
 }
 
+bool addNextRule(argument_rule_t* arg_rule_previous, argument_rule_t* arg_rule) {
+	//adicionando rule no fim da lista encadeada
+	if (arg_rule_previous->nextrule == NULL) {
+		arg_rule_previous->nextrule = arg_rule;
+		return true;
+	} else {
+		return addNextRule(arg_rule_previous->nextrule, arg_rule);
+	}
+}
+
 bool addRule(arguments_t* arguments, argument_rule_t* arg_rule){
 	//adicionando rule no fim da lista encadeada
+	if (arguments->firstrule == NULL) {
+		arguments->firstrule = arg_rule;
+		return true;
+	} else {
+		return addNextRule(arguments->firstrule, arg_rule);
+	}
+}
+
+
+bool destroyNextRule(argument_rule_t* arg_rule) {
+	if (arg_rule->nextrule != NULL) {
+		destroyNextRule(arg_rule->nextrule);
+		arg_rule->nextrule = NULL;
+	}
+	free(arg_rule);
 	return true;
 }
 
-bool destroyRules(arguments_t* arguments) {
-	//	free(argument_rule.sequence.file);//desalocando memoria do heap
+bool destroyFirstRule(arguments_t* arguments) {
+	if (arguments->firstrule != NULL) {
+		destroyNextRule(arguments->firstrule);
+		arguments->firstrule = NULL;
+	}
 	return true;
 }
+

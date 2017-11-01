@@ -14,6 +14,7 @@
 static const long SEQUENCE_INITIAL_VALUE = 0;
 
 bool initializeSequenceFile(sequence_t* sequence);
+bool initializeSequenceFiles(argument_rule_t* arg_rule);
 long sequenceNewValue(sequence_t* sequence);
 
 #endif /* SEQUENCE_H_ */
