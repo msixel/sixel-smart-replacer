@@ -1,7 +1,7 @@
 Exemplos de argumentos de linha de comando
 
--input ARQ_ORIGEM.TXT -output ARQ_DESTINO.TXT -rule header,51-80,seq:NEMTEDIGO -rule 2,10-19,XXXXXXXXXX -rule 5,10-19,seq:CNAB -rule 7,10-19,seq:CNAB -rule detail,1-9,seq:NEMTEDIGO -rule detail,20-29,seq:NEMTEDIGO -rule trailler,1-50,seq:NEMTEDIGO
+-i file_in/ARQ_ORIGEM.TXT -o file_out/ARQ_DESTINO.TXT -r header,51-80,seq:NEMTEDIGO -r 2,10-19,XXXXXXXXXX -r 5,10-19,seq:CNAB -r 7,10-19,seq:CNAB -r detail,1-9,seq:NEMTEDIGO -r detail,20-29,seq:NEMTEDIGO -r trailler,1-50,seq:NEMTEDIGO
 
-ou
 
--i ARQ_ORIGEM.TXT -o ARQ_DESTINO.TXT -r header,51-80,seq:NEMTEDIGO -r 2,10-19,XXXXXXXXXX -r 5,10-19,seq:CNAB -r 7,10-19,seq:CNAB -r detail,1-9,seq:NEMTEDIGO -r detail,20-29,seq:NEMTEDIGO -r trailler,1-50,seq:NEMTEDIGO
+
+-i file_in/PAG05102017600039580270.rem -o file_out/PAG05102017600039580270.rem -r 1,161-163,seq:REMESSA -r header,144-151,01112017

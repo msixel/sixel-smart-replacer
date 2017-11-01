@@ -16,6 +16,16 @@
 #include <stdbool.h>
 #include "file_record_constants.h"
 
+#define _BUFFER_LINE_SIZE 1024
+
+static const char* _MESSAGE_ERROR = "Erro:";
+static const char* _MESSAGE_INVALID_RANGE = "BLOCO NAO LOCALIZADO NA LINHA";
+static const char* _MESSAGE_INVALID_LITERAL_LENGHT = "BLOCO PARA SUBSTITUICAO DE TAMANHO INVALIDO";
+static const char* _MESSAGE_REPLACEMENT_NOT_FOUND = "ESPERADO SEQUENCE OU VALOR LITERAL";
+
+static const char* _MESSAGE_FILE_NOT_OPEN_READ = "ARQUIVO NAO PODE SER ABERTO PARA LEITURA";
+static const char* _MESSAGE_FILE_NOT_OPEN_WRITE = "ARQUIVO NAO PODE SER ABERTO PARA ESCRITA";
+
 bool processRowValue (char* rowValue, int rowNumber, argument_rule_t* arg_rule) {
 	int blockLength;
 	char* blockBuffer;
@@ -25,8 +35,8 @@ bool processRowValue (char* rowValue, int rowNumber, argument_rule_t* arg_rule) 
 		//localizada linha para receber tratamento
 
 		if (arg_rule->endPosition > strlen(rowValue)) {
-			fprintf(stderr, "BLOCO NAO LOCALIZADO NA LINHA [POSICAO_INICIAL: %ld, POSICAO_FINAL: %ld]",
-					arg_rule->startPosition, arg_rule->endPosition);
+			fprintf(stderr, "%s\t%s [POSICAO_INICIAL: %ld, POSICAO_FINAL: %ld, TAMANHO: %ld %s]\n",
+					_MESSAGE_ERROR, _MESSAGE_INVALID_RANGE, arg_rule->startPosition, arg_rule->endPosition, strlen(rowValue), rowValue);
 			return false;
 		}
 
@@ -45,14 +55,14 @@ bool processRowValue (char* rowValue, int rowNumber, argument_rule_t* arg_rule) 
 		} else if (arg_rule->literalValue != NULL) {
 			blockLength = strlen(arg_rule->literalValue);
 			if (arg_rule->endPosition - arg_rule->startPosition + 1 != blockLength ) {
-				fprintf(stderr, "BLOCO PARA SUBSTITUICAO DE TAMANHO INVALIDO [POSICAO_INICIAL: %ld, POSICAO_FINAL: %ld, BLOCK_LENGTH: %d]",
-						arg_rule->startPosition, arg_rule->endPosition, blockLength);
+				fprintf(stderr, "%s\t%s [POSICAO_INICIAL: %ld, POSICAO_FINAL: %ld, BLOCK_LENGTH: %d]\n",
+						_MESSAGE_ERROR, _MESSAGE_INVALID_LITERAL_LENGHT, arg_rule->startPosition, arg_rule->endPosition, blockLength);
 				return false;
 			}
 			memcpy(rowValue + ((arg_rule->startPosition - 1) * sizeof(char)), arg_rule->literalValue, (blockLength) * sizeof(char));
 
 		} else {
-			fprintf(stderr, "ESPERADO SEQUENCE OU VALOR LITERAL");
+			fprintf(stderr, "%s\t%s\n", _MESSAGE_ERROR, _MESSAGE_REPLACEMENT_NOT_FOUND);
 			return false;
 		}
 	}
@@ -68,25 +78,25 @@ bool processRowValue (char* rowValue, int rowNumber, argument_rule_t* arg_rule) 
 bool processFile(arguments_t arguments) {
 	FILE* inputFile;
 	FILE* outputFile;
-	char rowValueBuffer[2][1024];
+	char rowValueBuffer[2][_BUFFER_LINE_SIZE];
 	int currentRowBuffer;
 	int previousRowBuffer;
 	int rowNumber;
 
 	//abrindo arquivos
 	if ((inputFile = fopen(arguments.inputfile, "r")) == NULL) {
-		fprintf(stderr, "Arquivo %s nao pode ser aberto para leitura.\n", arguments.inputfile);
+		fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_ERROR, _MESSAGE_FILE_NOT_OPEN_READ, arguments.inputfile);
 		return false;
 	}
 	if ((outputFile = fopen(arguments.outputfile, "w")) == NULL) {
-		fprintf(stderr, "Arquivo %s nao pode ser aberto para escrita.\n", arguments.outputfile);
+		fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_ERROR, _MESSAGE_FILE_NOT_OPEN_WRITE, arguments.outputfile);
 		return false;
 	}
 
 	currentRowBuffer = 0;
 	previousRowBuffer = -1;
 	//iterando arquivos e fazendo substituicoes
-	for (rowNumber=0; fscanf(inputFile, "%s\n", rowValueBuffer[currentRowBuffer])!= EOF; rowNumber++) {
+	for (rowNumber=0; fgets(rowValueBuffer[currentRowBuffer], _BUFFER_LINE_SIZE, inputFile); rowNumber++) {
 		if (previousRowBuffer>-1) {
 			//hora da escrita atrasada no arquivo de saida - precisa disso para identificar registro trailler
 			if (!processRowValue(rowValueBuffer[previousRowBuffer], rowNumber, arguments.firstrule)) {
@@ -94,7 +104,7 @@ bool processFile(arguments_t arguments) {
 				fclose(outputFile);
 				return false;
 			}
-			fprintf(outputFile, "%s\n", rowValueBuffer[previousRowBuffer]);
+			fprintf(outputFile, "%s", rowValueBuffer[previousRowBuffer]);
 		}
 		//swap entre buffers
 		previousRowBuffer = currentRowBuffer;
