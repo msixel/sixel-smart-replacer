@@ -11,5 +11,6 @@
 static const int _HEADER_RECORD_CODE = 1;
 static const int _DETAIL_RECORD_CODE = -1;
 static const int _TRAILLER_RECORD_CODE = -9;
+static const int _CUSTOM_RECORD_CODE = -2;
 
 #endif /* FILE_RECORD_CONSTANTS_H_ */

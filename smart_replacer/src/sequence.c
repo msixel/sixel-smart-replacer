@@ -73,6 +73,3 @@ long sequenceNewValue(sequence_t* sequence) {
 	return sequenceValue;
 }
 
-
-
-

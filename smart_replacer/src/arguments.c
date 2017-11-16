@@ -41,15 +41,8 @@ static const char* _TOKEN_RULE_POS_DELIMITER = "-";
 static const char* _TOKEN_RULE_SEQUENCE_PREFIX = "seq:";
 static const char* _TOKEN_RULE_CUSTOM_ROW_PREFIX = "custom:";
 static const char* _TOKEN_RULE_CUSTOM_ROW_DELIMITER = "=";
+static const char* _TOKEN_RULE_CUSTOM_ROW_BLOCK_CONCAT_DELIMITER = ".";
 
-
-bool parseRuleSequenceParameter(char* arg, sequence_t* sequence) {
-	sequence->name = strdup(arg);
-	sequence->file = (char*) calloc(strlen (arg) + strlen(_SEQUENCE_FILE_EXTENSION) + 1, sizeof(char));// alocando memoria dinamicamente do heap
-	sequence->file = strcpy(sequence->file, arg);
-	sequence->file = strcat(sequence->file, _SEQUENCE_FILE_EXTENSION);
-	return true;
-}
 
 bool parseRuleValueParameter(char* arg, argument_rule_t* arg_rule) {
 	//argumento valor (sequence ou literal)
@@ -58,9 +51,11 @@ bool parseRuleValueParameter(char* arg, argument_rule_t* arg_rule) {
 		//criando sequence
 		sequenceName += strlen(_TOKEN_RULE_SEQUENCE_PREFIX);//avancando o token para obter o nome da sequence
 		arg_rule->sequence = (sequence_t*)malloc(sizeof(sequence_t));
-		if (!parseRuleSequenceParameter(sequenceName, arg_rule->sequence)) {
-			return false;
-		}
+		arg_rule->sequence->name = strdup(sequenceName);
+		arg_rule->sequence->file = (char*) calloc(strlen (sequenceName) + strlen(_SEQUENCE_FILE_EXTENSION) + 1, sizeof(char));// alocando memoria dinamicamente do heap
+		arg_rule->sequence->file = strcpy(arg_rule->sequence->file, sequenceName);
+		arg_rule->sequence->file = strcat(arg_rule->sequence->file, _SEQUENCE_FILE_EXTENSION);
+
 		arg_rule->literalValue=NULL;
 	} else {
 		arg_rule->sequence = NULL;
@@ -69,18 +64,71 @@ bool parseRuleValueParameter(char* arg, argument_rule_t* arg_rule) {
 	return true;
 }
 
-bool parseRuleRowCustomBlockParameter(char* arg, )
+bool parseRuleRowCustomBlockParameter(char* arg, custom_row_block_t* custom_row_block) {
+	//8-8
+	char* argSubToken;
+
+	if (strlen(arg)==0 || (argSubToken = strtok_r(arg, _TOKEN_RULE_POS_DELIMITER, &arg))==NULL) {
+		fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_ERROR, _MESSAGE_INVALID_FORMAT, arg);
+		return false;
+	}
+	custom_row_block->startPosition = strtol(argSubToken, NULL, 0);
+
+	if ((argSubToken = strtok_r(arg, _TOKEN_RULE_POS_DELIMITER, &arg))==NULL) {
+		fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_ERROR, _MESSAGE_INVALID_FORMAT, arg);
+		return false;
+	}
+	custom_row_block->endPosition = strtol(argSubToken, NULL, 0);
+	custom_row_block->nextblock = NULL;
+
 	return true;
 }
+
+bool parseRuleRowCustomBlockParameters(char* arg, custom_row_t* custom_row) {
+	// 8-8.14-14.73-77
+	char* argToken;
+	custom_row_block_t* custom_row_block;
+
+	argToken = strtok_r(arg, _TOKEN_RULE_CUSTOM_ROW_BLOCK_CONCAT_DELIMITER, &arg);
+	while (argToken != NULL) {
+		//argumento blocos posicionais - lista encadeada   - 8-8.14-14
+		if (strlen(argToken)==0) {
+			fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_ERROR, _MESSAGE_INVALID_FORMAT, argToken);
+			return false;
+		}
+		custom_row_block = malloc(sizeof(custom_row_block_t));
+		if (!parseRuleRowCustomBlockParameter(argToken, custom_row_block)) {
+			return false;
+		}
+		//adicionando no final da lista encadeada
+		appendRuleCustomRowBlock(custom_row, custom_row_block);
+
+		argToken = strtok_r(arg, _TOKEN_RULE_CUSTOM_ROW_BLOCK_CONCAT_DELIMITER, &arg);
+	}
+	return true;
+}
+
 
 bool parseRuleRowCustomParameter(char* arg, custom_row_t* custom_row ) {
 	int contador;
 	char* argToken;
+
+	custom_row->firstblock = NULL;
+	custom_row->discriminator = NULL;
+
 	argToken = strtok_r(arg, _TOKEN_RULE_CUSTOM_ROW_DELIMITER, &arg);
 	for (contador=0; argToken != NULL; contador++ ) {
 		switch(contador) {
 		case 0:
-			//argumento blocos posicionais - lista encadeada
+			//argumento blocos posicionais - lista encadeada   - 8-8.14-14
+			if (strlen(argToken)==0) {
+				fprintf(stderr, "%s\t%s [%s]\n", _MESSAGE_ERROR, _MESSAGE_INVALID_FORMAT, argToken);
+				return false;
+			}
+//			custom_row->firstblock = malloc(sizeof(custom_row_block_t));
+			if (!parseRuleRowCustomBlockParameters(argToken, custom_row)) {
+				return false;
+			}
 			break;
 
 		case 1:
@@ -115,7 +163,7 @@ bool parseRuleRowParameter(char* arg, argument_rule_t* arg_rule) {
 	} else if ((customRowArg = strstr(arg, _TOKEN_RULE_CUSTOM_ROW_PREFIX))!=NULL) {
 		customRowArg += strlen(_TOKEN_RULE_CUSTOM_ROW_PREFIX);//avancando o token para obter as definicoes do custom row
 		arg_rule->custom_row = (custom_row_t*) malloc(sizeof(custom_row_t));
-		arg_rule->rowNumber = -1;
+		arg_rule->rowNumber = _CUSTOM_RECORD_CODE;
 		if (!parseRuleRowCustomParameter(customRowArg, arg_rule->custom_row)) {
 			return false;
 		}
@@ -271,6 +319,26 @@ bool parseArgumentsParameters(int argc, char *argv[], arguments_t* arguments) {
 	return true;
 }
 
+bool appendNextRuleCustomRowBlock(custom_row_block_t* custom_row_block_previous, custom_row_block_t* custom_row_block) {
+	//adicionando custom row block no fim da lista encadeada
+	if (custom_row_block_previous->nextblock == NULL) {
+		custom_row_block_previous->nextblock = custom_row_block;
+		return true;
+	} else {
+		return appendNextRuleCustomRowBlock(custom_row_block_previous->nextblock, custom_row_block);
+	}
+}
+
+bool appendRuleCustomRowBlock(custom_row_t* custom_row, custom_row_block_t* custom_row_block){
+	//adicionando custom row block no fim da lista encadeada
+	if (custom_row->firstblock == NULL) {
+		custom_row->firstblock = custom_row_block;
+		return true;
+	} else {
+		return appendNextRuleCustomRowBlock(custom_row->firstblock, custom_row_block);
+	}
+}
+
 bool appendNextRule(argument_rule_t* arg_rule_previous, argument_rule_t* arg_rule) {
 	//adicionando rule no fim da lista encadeada
 	if (arg_rule_previous->nextrule == NULL) {
@@ -291,22 +359,28 @@ bool appendRule(arguments_t* arguments, argument_rule_t* arg_rule){
 	}
 }
 
-void destroyRuleRowCustomBlock(custom_row_block* custom_row_block) {
+void destroyRuleCustomRowBlock(custom_row_block_t* custom_row_block) {
 	if (custom_row_block->nextblock != NULL) {
-		destroyRuleRowCustomBlock(custom_row_block->nextblock);
+		destroyRuleCustomRowBlock(custom_row_block->nextblock);
 		custom_row_block->nextblock = NULL;
 	}
 	free(custom_row_block);
 }
 
+void destroyRuleCustomRow(custom_row_t* custom_row) {
+	if (custom_row->firstblock != NULL) {
+		destroyRuleCustomRowBlock(custom_row->firstblock);
+		custom_row->firstblock = NULL;
+	}
+	free(custom_row->discriminator);
+	custom_row->discriminator = NULL;
+}
+
 void destroyRule(argument_rule_t* arg_rule) {
 	if (arg_rule->custom_row != NULL) {
-		if (arg_rule->custom_row->firstblock != NULL) {
-			destroyRuleRowCustomBlock(arg_rule->custom_row->firstblock);
-			arg_rule->custom_row->firstblock = NULL;
-		}
-		free(arg_rule->custom_row->discriminator);
+		destroyRuleCustomRow(arg_rule->custom_row);
 		free(arg_rule->custom_row);
+		arg_rule->custom_row = NULL;
 	}
 	if (arg_rule->nextrule != NULL) {
 		destroyRule(arg_rule->nextrule);
@@ -314,11 +388,15 @@ void destroyRule(argument_rule_t* arg_rule) {
 	}
 	if (arg_rule->sequence != NULL) {
 		free(arg_rule->sequence->file);
+		arg_rule->sequence->file = NULL;
 		free(arg_rule->sequence->name);
+		arg_rule->sequence->name = NULL;
 		free(arg_rule->sequence);
+		arg_rule->sequence = NULL;
 	}
 	if (arg_rule->literalValue != NULL) {
 		free(arg_rule->literalValue);
+		arg_rule->literalValue = NULL;
 	}
 	free(arg_rule);
 }
@@ -330,6 +408,5 @@ void destroyArguments(arguments_t* arguments) {
 	}
 	free(arguments->inputfile);
 	free(arguments->outputfile);
-//	free(arguments); //alocacao estatica com variavel typedef - nao utilizou malloc, calloc ou realloc
 }
 

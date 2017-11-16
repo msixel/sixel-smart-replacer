@@ -17,7 +17,7 @@ typedef struct custom_row_block {
 	long startPosition;
 	long endPosition;
 	struct custom_row_block* nextblock;
-} custom_row_block;
+} custom_row_block_t;
 
 typedef struct custom_row {
 	struct custom_row_block* firstblock;
