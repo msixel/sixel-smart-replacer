@@ -35,7 +35,7 @@ static const char* _MESSAGE_REQUIRED_INPUT_FILE_ARGUMENT = "ARGUMENTO INPUT FILE
 static const char* _MESSAGE_REQUIRED_OUTPUT_FILE_ARGUMENT = "ARGUMENTO OUTPUT FILE NAO INFORMADO";
 static const char* _MESSAGE_REQUIRED_RULE_ARGUMENT = "NENHUM ARGUMENTO REGRA INFORMADO";
 
-static const char* _MESSAGE_USAGE = "Uso: sixel_smart_replacer -i[nput] ARQUIVO_ORIGEM -o[utput] ARQUIVO_DESTINO -r[ule] LINHA,POSICAO_INICIAL-POSICAO_FINAL,VALOR [-r[ule] LINHA,POSICAO_INICIAL-POSICAO_FINAL,VALOR]...\n\nParametros:\n\tARQUIVO_ORIGEM - Arquivo a ser lido e convertido\n\tARQUIVO_DESTINO - Arquivo a ser escrito ou sobrescrito\n\tPOSICAO_INICIAL - Posicao inicial a ser substituida\n\tPOSICAO_FINAL - Posicao final a ser substituida (inclusive)\n\tVALOR - Valor literal ou sequencia a ser escrito (sequencia no formato seq:NOME_SEQUENCIA)\n\n";
+static const char* _MESSAGE_USAGE = "\nSixel Smart Replacer Tool for flat files\n\nUso: sixel_smart_replacer -i[nput] ARQUIVO_ORIGEM -o[utput] ARQUIVO_DESTINO -r[ule] LINHA,POSICAO_INICIAL-POSICAO_FINAL,VALOR [-r[ule] LINHA,POSICAO_INICIAL-POSICAO_FINAL,VALOR]...\n\nParametros:\n  ARQUIVO_ORIGEM\t- Arquivo de entrada a ser lido e convertido\n  ARQUIVO_DESTINO\t- Arquivo de saida a ser escrito ou sobrescrito\n  LINHA\t\t\t- Numero literal da linha ou um dos seguintes coringas;\n\t\t\t  HEADER - linha inicial do arquivo\n\t\t\t  DETAIL - da segunda ate a penultima linha\n\t\t\t  FOOTER - ultima linha do arquivo\n\t\t\t  CUSTOM - tipo especificado pelo usuario no formato;\n\t\t\t\t   custom:INICIAL-FINAL[.INICIAL-FINAL]=VALOR\n  POSICAO_INICIAL\t- Posicao inicial do bloco a ser substituido\n  POSICAO_FINAL\t\t- Posicao final do bloco a ser substituido (inclusive)\n  VALOR\t\t\t- Valor literal a ser substituido ou \n\t\t\t  Sequencia no formato seq:NOME_SEQUENCIA\n\n";
 static const char* _TOKEN_RULE_DELIMITER = ",";
 static const char* _TOKEN_RULE_POS_DELIMITER = "-";
 static const char* _TOKEN_RULE_SEQUENCE_PREFIX = "seq:";
@@ -80,6 +80,15 @@ bool parseRuleRowCustomBlockParameter(char* arg, custom_row_block_t* custom_row_
 	}
 	custom_row_block->endPosition = strtol(argSubToken, NULL, 0);
 	custom_row_block->nextblock = NULL;
+	//validando sequence
+	if (custom_row_block->startPosition < 1) {
+		fprintf (stderr, "%s\nPOSICAO_INICIAL INVALIDA [%ld]\n", _MESSAGE_USAGE, custom_row_block->startPosition);
+		return false;
+	}
+	if (custom_row_block->startPosition > custom_row_block->endPosition) {
+		fprintf (stderr, "%s\nPOSICAO_FINAL DEVE SER MAIOR QUE POSICAO_INICIAL [%ld, %ld]\n", _MESSAGE_USAGE, custom_row_block->startPosition, custom_row_block->endPosition);
+		return false;
+	}
 
 	return true;
 }
@@ -229,11 +238,11 @@ bool parseRuleParameter(char* arg, argument_rule_t* arg_rule){
 	arg_rule->nextrule = NULL;
 	//validando sequence
 	if (arg_rule->startPosition < 1) {
-		fprintf (stderr, "POSICAO_INICIAL INVALIDA [%ld]\n", arg_rule->startPosition);
+		fprintf (stderr, "%s\nPOSICAO_INICIAL INVALIDA [%ld]\n", _MESSAGE_USAGE, arg_rule->startPosition);
 		return false;
 	}
 	if (arg_rule->startPosition > arg_rule->endPosition) {
-		fprintf (stderr, "POSICAO_FINAL DEVE SER MAIOR QUE POSICAO_INICIAL [%ld, %ld]\n", arg_rule->startPosition, arg_rule->endPosition);
+		fprintf (stderr, "%s\nPOSICAO_FINAL DEVE SER MAIOR QUE POSICAO_INICIAL [%ld, %ld]\n", _MESSAGE_USAGE, arg_rule->startPosition, arg_rule->endPosition);
 		return false;
 	}
 
@@ -276,7 +285,9 @@ bool parseArgumentsParameters(int argc, char *argv[], arguments_t* arguments) {
 				if (contador<argc) {
 					argument_rule_t* arg_rule;
 					arg_rule = (argument_rule_t*) malloc(sizeof(argument_rule_t));
-					parseRuleParameter(argv[contador], arg_rule);
+					if (!parseRuleParameter(argv[contador], arg_rule)) {
+						return false;
+					}
 					appendRule(arguments, arg_rule);
 				}
 			} else {
